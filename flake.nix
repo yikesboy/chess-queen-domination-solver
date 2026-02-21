@@ -8,14 +8,14 @@
 
   outputs = { self, nixpkgs, flake-utils }:
     flake-utils.lib.eachDefaultSystem (system:
-      let
-        pkgs = nixpkgs.legacyPackages.${system};
-      in
-      {
+      let pkgs = nixpkgs.legacyPackages.${system};
+      in {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             python3
             uv
+            python3Packages.clingo
+            python3Packages.cffi
           ];
 
           shellHook = ''

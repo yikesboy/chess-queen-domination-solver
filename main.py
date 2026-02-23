@@ -1,7 +1,7 @@
 import argparse
 import sys
 from dataclasses import dataclass
-from typing import List
+from typing import List, Set, Tuple
 
 import clingo
 
@@ -48,6 +48,17 @@ def build_asp_program(problem: ProblemInput) -> str:
     cols(1..{problem.cols}).
     n_queens({problem.n_queens}).
 
+    {{ queen(C, R) : cols(C), rows(R) }}.
+
+    :- n_queens(N), #count {{ C, R : queen(C, R) }} != N.
+
+    dominated(C, R) :- queen(C, R).
+    dominated(C, R) :- queen(C2, R), cols(C), cols(C2).
+    dominated(C, R) :- queen(C, R2), rows(R), rows(R2).
+    dominated(C, R) :- queen(C2, R2), cols(C), rows(R), C - C2 == R - R2.
+    dominated(C, R) :- queen(C2, R2), cols(C), rows(R), C - C2 == R2 - R.
+
+    :- cols(C), rows(R), not dominated(C, R).
     """
 
 
@@ -57,13 +68,16 @@ def solve(problem: ProblemInput):
     ctl.add("base", [], program)
     ctl.ground([("base", [])])
 
+    found = False
     with ctl.solve(yield_=True) as handle:
         for model in handle:
-
             print("Model found:", model)
-            return
+            found = True
 
-    print("no solution found.")
+    if not found:
+        print(
+            f" No solution found for {problem.n_queens} queen(s) on a {problem.rows}×{problem.cols} board."
+        )
 
 
 def main():

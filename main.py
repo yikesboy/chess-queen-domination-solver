@@ -1,7 +1,6 @@
-import argparse
 import sys
 from dataclasses import dataclass
-from typing import List, Set, Tuple
+from typing import List, Tuple
 
 import clingo
 
@@ -14,32 +13,29 @@ class ProblemInput:
 
 
 def read_input() -> ProblemInput:
-    parser = argparse.ArgumentParser(
-        prog="main.py",
-        description="Chess queen domination solver",
-        epilog="Example: python3 main.py 2 4 5",
-    )
-    parser.add_argument("n", type=int, help="number of queens to place")
-    parser.add_argument("rows", type=int, help="number of rows on the board")
-    parser.add_argument("cols", type=int, help="number of columns on the board")
-
-    args = parser.parse_args()
-
-    errors: List[str] = []
-    if args.n < 1:
-        errors.append(f"n must be a positive integer, got {args.n}")
-    if args.rows < 1:
-        errors.append(f"rows must be a positive integer, got {args.rows}")
-    if args.cols < 1:
-        errors.append(f"cols must be a positive integer, got {args.cols}")
-
-    if errors:
-        for error in errors:
-            print(f"Error: {error}", file=sys.stderr)
-        parser.print_help(sys.stderr)
+    line = sys.stdin.read().strip()
+    parts = line.split()
+    if len(parts) != 3:
+        print("Usage: exptected 3 space separated integers <n> <rows> <cols>")
         sys.exit(1)
 
-    return ProblemInput(n_queens=args.n, rows=args.rows, cols=args.cols)
+    try:
+        n, rows, cols = int(parts[0]), int(parts[1]), int(parts[2])
+    except ValueError:
+        print("Error: all inputs must be integers")
+        sys.exit(1)
+
+    if n < 1:
+        print(f"n must be a positive integer, got {n}")
+        sys.exit(1)
+    if rows < 1:
+        print(f"rows must be a positive integer, got {rows}")
+        sys.exit(1)
+    if cols < 1:
+        print(f"cols must be a positive integer, got {cols}")
+        sys.exit(1)
+
+    return ProblemInput(n_queens=n, rows=rows, cols=cols)
 
 
 def build_asp_program(problem: ProblemInput) -> str:
@@ -61,24 +57,29 @@ def build_asp_program(problem: ProblemInput) -> str:
     :- cols(C), rows(R), not dominated(C, R).
     """
 
+def parse_output(model: clingo.Model) -> List[Tuple[int, int]]:
+    queens: List[Tuple[int, int]] = []
+    for atom in model.symbols(shown=True):
+        if atom.name == "queen" and len(atom.arguments) == 2:
+            col = atom.arguments[0].number
+            row = atom.arguments[1].number
+            queens.append((col, row))
+    return queens
 
 def solve(problem: ProblemInput):
     program = build_asp_program(problem)
-    ctl = clingo.Control()
+    ctl = clingo.Control(["--models=1"])
     ctl.add("base", [], program)
     ctl.ground([("base", [])])
 
     found = False
     with ctl.solve(yield_=True) as handle:
         for model in handle:
-            print("Model found:", model)
             found = True
-
+            for col, row in parse_output(model):
+                print(f"{col} {row}")
     if not found:
-        print(
-            f" No solution found for {problem.n_queens} queen(s) on a {problem.rows}×{problem.cols} board."
-        )
-
+        print(f"No solution found for {problem.n_queens} queen(s) on a {problem.rows}x{problem.cols} board.")
 
 def main():
     problem = read_input()
